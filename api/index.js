@@ -10,15 +10,25 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "../public")));
 
 // ─── DB Connection Pool ────────────────────────────────────────────────────
+const DB_NAME = process.env.DB_NAME || "test";
+
 const pool = mysql.createPool({
-  host:             process.env.DB_HOST,
-  port:             parseInt(process.env.DB_PORT || "3306"),
-  user:             process.env.DB_USER,
-  password:         process.env.DB_PASSWORD,
-  database:         process.env.DB_NAME,
-  ssl:              { rejectUnauthorized: false }, // ← corregido (true causaba el 500)
+  host:               process.env.DB_HOST,
+  port:               parseInt(process.env.DB_PORT || "4000"),
+  user:               process.env.DB_USER,
+  password:           process.env.DB_PASSWORD,
+  database:           DB_NAME,
+  ssl:                { rejectUnauthorized: false },
   waitForConnections: true,
-  connectionLimit:  10,
+  connectionLimit:    10,
+});
+
+// Forzar selección de BD en cada nueva conexión del pool
+pool.on("connection", (connection) => {
+  connection.query(`USE \`${DB_NAME}\``, (err) => {
+    if (err) console.error("❌ Error al seleccionar BD:", err.message);
+    else console.log(`✅ Conexión usando BD: ${DB_NAME}`);
+  });
 });
 
 // ─── Init Tables ───────────────────────────────────────────────────────────
@@ -26,7 +36,8 @@ async function initTables() {
   let conn;
   try {
     conn = await pool.getConnection();
-    console.log("✅ Conexión a BD exitosa");
+    await conn.query(`USE \`${DB_NAME}\``);
+    console.log("✅ Conexión a BD exitosa, usando:", DB_NAME);
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS conceptos (
@@ -71,13 +82,12 @@ async function initTables() {
     `);
     console.log("✅ Tablas listas.");
   } catch (err) {
-    // Logs detallados para ver en Vercel → Functions → Logs
     console.error("❌ Error de BD:", err.message);
     console.error("   Código:", err.code);
     console.error("   Host:",   process.env.DB_HOST);
     console.error("   Puerto:", process.env.DB_PORT);
     console.error("   Usuario:", process.env.DB_USER);
-    console.error("   Base:",   process.env.DB_NAME);
+    console.error("   Base:",   DB_NAME);
   } finally {
     if (conn) conn.release();
   }
@@ -89,21 +99,29 @@ function makeCRUD(table, fields) {
 
   // GET all
   router.get("/", async (req, res) => {
+    let conn;
     try {
-      const [rows] = await pool.query(
+      conn = await pool.getConnection();
+      await conn.query(`USE \`${DB_NAME}\``);
+      const [rows] = await conn.query(
         `SELECT * FROM ${table} WHERE activo = 1 ORDER BY id DESC`
       );
       res.json(rows);
     } catch (err) {
       console.error(`GET /${table} error:`, err.message, err.code);
       res.status(500).json({ error: err.message, code: err.code });
+    } finally {
+      if (conn) conn.release();
     }
   });
 
   // GET by id
   router.get("/:id", async (req, res) => {
+    let conn;
     try {
-      const [rows] = await pool.query(
+      conn = await pool.getConnection();
+      await conn.query(`USE \`${DB_NAME}\``);
+      const [rows] = await conn.query(
         `SELECT * FROM ${table} WHERE id = ?`,
         [req.params.id]
       );
@@ -112,16 +130,21 @@ function makeCRUD(table, fields) {
     } catch (err) {
       console.error(`GET /${table}/:id error:`, err.message, err.code);
       res.status(500).json({ error: err.message, code: err.code });
+    } finally {
+      if (conn) conn.release();
     }
   });
 
   // POST create
   router.post("/", async (req, res) => {
+    let conn;
     try {
+      conn = await pool.getConnection();
+      await conn.query(`USE \`${DB_NAME}\``);
       const values       = fields.map((f) => req.body[f] ?? null);
       const cols         = fields.join(", ");
       const placeholders = fields.map(() => "?").join(", ");
-      const [result] = await pool.query(
+      const [result] = await conn.query(
         `INSERT INTO ${table} (${cols}) VALUES (${placeholders})`,
         values
       );
@@ -133,15 +156,20 @@ function makeCRUD(table, fields) {
         console.error(`POST /${table} error:`, err.message, err.code);
         res.status(500).json({ error: err.message, code: err.code });
       }
+    } finally {
+      if (conn) conn.release();
     }
   });
 
   // PUT update
   router.put("/:id", async (req, res) => {
+    let conn;
     try {
+      conn = await pool.getConnection();
+      await conn.query(`USE \`${DB_NAME}\``);
       const setClause = fields.map((f) => `${f} = ?`).join(", ");
       const values    = [...fields.map((f) => req.body[f] ?? null), req.params.id];
-      await pool.query(`UPDATE ${table} SET ${setClause} WHERE id = ?`, values);
+      await conn.query(`UPDATE ${table} SET ${setClause} WHERE id = ?`, values);
       res.json({ message: "Actualizado exitosamente" });
     } catch (err) {
       if (err.code === "ER_DUP_ENTRY") {
@@ -150,17 +178,24 @@ function makeCRUD(table, fields) {
         console.error(`PUT /${table}/:id error:`, err.message, err.code);
         res.status(500).json({ error: err.message, code: err.code });
       }
+    } finally {
+      if (conn) conn.release();
     }
   });
 
   // DELETE (soft)
   router.delete("/:id", async (req, res) => {
+    let conn;
     try {
-      await pool.query(`UPDATE ${table} SET activo = 0 WHERE id = ?`, [req.params.id]);
+      conn = await pool.getConnection();
+      await conn.query(`USE \`${DB_NAME}\``);
+      await conn.query(`UPDATE ${table} SET activo = 0 WHERE id = ?`, [req.params.id]);
       res.json({ message: "Eliminado exitosamente" });
     } catch (err) {
       console.error(`DELETE /${table}/:id error:`, err.message, err.code);
       res.status(500).json({ error: err.message, code: err.code });
+    } finally {
+      if (conn) conn.release();
     }
   });
 
@@ -168,16 +203,19 @@ function makeCRUD(table, fields) {
 }
 
 // ─── Routes ───────────────────────────────────────────────────────────────
-app.use("/api/conceptos",       makeCRUD("conceptos",      ["clave", "descripcion", "tipo"]));
-app.use("/api/destinos",        makeCRUD("destinos",       ["clave", "nombre", "responsable"]));
-app.use("/api/productos",       makeCRUD("productos",      ["clave", "descripcion", "unidad_id", "stock_minimo"]));
-app.use("/api/unidades-medida", makeCRUD("unidades_medida",["clave", "descripcion", "abreviatura"]));
+app.use("/api/conceptos",       makeCRUD("conceptos",       ["clave", "descripcion", "tipo"]));
+app.use("/api/destinos",        makeCRUD("destinos",        ["clave", "nombre", "responsable"]));
+app.use("/api/productos",       makeCRUD("productos",       ["clave", "descripcion", "unidad_id", "stock_minimo"]));
+app.use("/api/unidades-medida", makeCRUD("unidades_medida", ["clave", "descripcion", "abreviatura"]));
 
-// Health check — muestra el error exacto si la BD falla
+// Health check
 app.get("/api/health", async (req, res) => {
+  let conn;
   try {
-    await pool.query("SELECT 1");
-    res.json({ status: "ok", db: "connected" });
+    conn = await pool.getConnection();
+    await conn.query(`USE \`${DB_NAME}\``);
+    await conn.query("SELECT 1");
+    res.json({ status: "ok", db: "connected", database: DB_NAME });
   } catch (err) {
     console.error("Health check failed:", err.message, err.code);
     res.status(500).json({
@@ -186,6 +224,8 @@ app.get("/api/health", async (req, res) => {
       error:  err.message,
       code:   err.code,
     });
+  } finally {
+    if (conn) conn.release();
   }
 });
 
