@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sistema de Almacén</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+
+  <!-- SIDEBAR NAV -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon">▦</span>
+      <span class="brand-text">ALMACÉN</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">CATÁLOGOS</div>
+      <a class="nav-item" data-view="conceptos" href="#">
+        <span class="nav-icon">◈</span> Conceptos
+      </a>
+      <a class="nav-item" data-view="destinos" href="#">
+        <span class="nav-icon">◉</span> Destinos
+      </a>
+      <a class="nav-item" data-view="productos" href="#">
+        <span class="nav-icon">◐</span> Productos
+      </a>
+      <a class="nav-item" data-view="unidades" href="#">
+        <span class="nav-icon">◑</span> Unidades de Medida
+      </a>
+
+      <div class="nav-section-label" style="margin-top:2rem">DOCUMENTOS</div>
+      <a class="nav-item nav-item--coming" data-view="entradas" href="#">
+        <span class="nav-icon">↓</span> Entradas
+        <span class="badge-soon">Pronto</span>
+      </a>
+      <a class="nav-item nav-item--coming" data-view="salidas" href="#">
+        <span class="nav-icon">↑</span> Salidas
+        <span class="badge-soon">Pronto</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <span id="db-status" class="db-status">● Conectando...</span>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+    <header class="topbar">
+      <button class="hamburger" id="hamburger">☰</button>
+      <h1 class="topbar-title" id="topbar-title">Dashboard</h1>
+      <div class="topbar-actions">
+        <button class="btn btn--primary" id="btn-nuevo" style="display:none" onclick="App.openModal()">
+          + Nuevo Registro
+        </button>
+      </div>
+    </header>
+
+    <!-- Toast -->
+    <div id="toast" class="toast"></div>
+
+    <!-- Views -->
+    <div id="view-home" class="view active">
+      <div class="home-grid">
+        <div class="home-card" onclick="App.navigate('conceptos')">
+          <div class="home-card-icon">◈</div>
+          <div class="home-card-label">Conceptos</div>
+        </div>
+        <div class="home-card" onclick="App.navigate('destinos')">
+          <div class="home-card-icon">◉</div>
+          <div class="home-card-label">Destinos</div>
+        </div>
+        <div class="home-card" onclick="App.navigate('productos')">
+          <div class="home-card-icon">◐</div>
+          <div class="home-card-label">Productos</div>
+        </div>
+        <div class="home-card" onclick="App.navigate('unidades')">
+          <div class="home-card-icon">◑</div>
+          <div class="home-card-label">Unidades de Medida</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-catalog" class="view">
+      <div class="table-wrapper">
+        <div class="table-toolbar">
+          <input type="text" class="search-input" id="search-input" placeholder="Buscar..." oninput="App.filterTable()"/>
+        </div>
+        <table class="data-table" id="data-table">
+          <thead id="table-head"></thead>
+          <tbody id="table-body"></tbody>
+        </table>
+        <p id="empty-msg" class="empty-msg" style="display:none">No hay registros aún.</p>
+      </div>
+    </div>
+
+    <div id="view-coming" class="view">
+      <div class="coming-soon">
+        <div class="coming-icon">⧖</div>
+        <h2>Módulo en desarrollo</h2>
+        <p>Esta sección estará disponible próximamente.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL -->
+  <div id="modal-overlay" class="modal-overlay" onclick="App.closeModal(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modal-title">Nuevo Registro</h2>
+        <button class="modal-close" onclick="App.closeModal()">✕</button>
+      </div>
+      <form id="modal-form" onsubmit="App.submitForm(event)">
+        <div id="form-fields"></div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn--ghost" onclick="App.closeModal()">Cancelar</button>
+          <button type="submit" class="btn btn--primary" id="btn-submit">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
